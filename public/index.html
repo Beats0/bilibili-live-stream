@@ -1,0 +1,131 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="referrer" content="no-referrer">
+  <title>live</title>
+  <style>
+      .labTitle {
+          display: inline-block;
+          width: 160px;
+          text-align: right;
+          margin-right: 10px;
+      }
+  </style>
+</head>
+<body>
+<div style="margin: 10px 0;">
+  <input id="roomid" type="text" placeholder="roomid" value="5050">
+  <button id="btn" onclick="init()">init</button>
+</div>
+<div id="info"></div>
+<div id="logInfo"></div>
+<video width="70%" height="70%" id="videoElement" controls autoplay></video>
+<script type="text/javascript" src="./flv.min.js"></script>
+<script>
+  let flvPlayer = null
+  let t = null
+
+  function init() {
+    const roomid = document.querySelector('#roomid').value
+    console.log(roomid)
+    const url = `/api/roomData?roomid=${ roomid }`
+    fetch(url)
+      .then(res => res.json())
+      .then(res => {
+        if (res.cid) {
+          renderRoomInfo(res)
+          getLiveData(res.cid)
+        } else {
+          window.alert('error')
+        }
+      })
+  }
+
+  function getLiveData(cid) {
+    const url = `/api/liveData?cid=${ cid }`
+    fetch(url)
+      .then(res => res.json())
+      .then(res => {
+        if (res.code !== 0) {
+          return
+        }
+        const durl = res.data.play_url.durl || []
+        console.log('durl', durl)
+        if (durl.length === 0) return;
+        const durlUrl = durl[0].url
+        console.log('durlUrl', durlUrl)
+        let liveUrl = `/api/${durlUrl}`
+        document.querySelector('#durlUrl').innerHTML = `<span class="labTitle">stream url:</span> <a href="${ durlUrl }" target="_blank">durlUrl</a>`
+        document.querySelector('#urlinfo').innerHTML = `<span class="labTitle">proxy stream url:</span> <a href="${ liveUrl }" target="_blank">api url</a>`
+        loadPlayer(liveUrl)
+      })
+  }
+
+  function renderRoomInfo(data) {
+    const el = document.querySelector('#info')
+    el.innerHTML = `
+      <div><span class="labTitle">title: </span><a href="https://live.bilibili.com/${ data.cid }" target="_blank">${ data.title }</a></div>
+      <div><span class="labTitle">cid: </span><a href="https://live.bilibili.com/${ data.cid }" target="_blank">${ data.cid }</a></div>
+      <div><span class="labTitle">sid: </span><a href="https://live.bilibili.com/${ data.sid }" target="_blank">${ data.sid }</a></div>
+      <div><span class="labTitle">uid: </span><a href="https://space.bilibili.com/${ data.uid }" target="_blank">${ data.uid }</a></div>
+      <div><span class="labTitle">live_status:</span> ${ data.live_status }</div>
+      <div id="durlUrl"></div>
+      <div id="urlinfo"></div>
+    `
+  }
+
+  function loadPlayer(liveUrl) {
+    if (!flvjs.isSupported()) {
+      window.alert('不支持flvjs')
+      return
+    }
+    const videoElement = document.getElementById('videoElement');
+    if (flvPlayer) {
+      flvPlayer.pause();
+      flvPlayer.unload();
+      flvPlayer.detachMediaElement();
+      flvPlayer.destroy();
+      flvPlayer = null;
+    }
+    // create
+    flvPlayer = flvjs.createPlayer({
+      type: 'flv',
+      url: liveUrl,
+      isLive: true,
+      lazyLoad: false,
+    });
+    flvPlayer.attachMediaElement(videoElement);
+    flvPlayer.load();
+    flvPlayer.play();
+    flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+      console.log('ERROR', errorType, errorDetail, errorInfo)
+    })
+    flvPlayer.on(flvjs.Events.MEDIA_INFO, (e) => {
+      console.log('MEDIA_INFO', e)
+    })
+
+    // log
+    if (t) {
+      clearInterval(t)
+      t = null
+    }
+    t = setInterval(() => {
+      renderLogInfo(flvPlayer.mediaInfo)
+    }, 2000)
+    console.log('flvPlayerv', flvPlayer)
+  }
+
+  function renderLogInfo(data) {
+    const el = document.querySelector('#logInfo')
+    el.innerHTML = `
+      <div><span class="labTitle">Mime Type</span>:${ data.mimeType }</div>
+      <div><span class="labTitle">Video Info</span>:${ data.width }x${ data.height } ${ data.fps }FPS</div>
+      <div><span class="labTitle">Audio Info</span>:${ data.audioSampleRate }Hz ${ data.audioDataRate }Kbps</div>
+    `
+  }
+</script>
+</body>
+</html>

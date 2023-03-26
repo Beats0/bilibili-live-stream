@@ -1,0 +1,12 @@
+{
+  "name": "bilibili-live-stream",
+  "version": "1.0.0",
+  "scripts": {
+    "start": "node app.js"
+  },
+  "dependencies": {
+    "http-proxy-middleware": "^2.0.6",
+    "querystring": "^0.2.1",
+    "request": "^2.88.2"
+  }
+}
