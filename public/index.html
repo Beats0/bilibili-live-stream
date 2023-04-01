@@ -17,8 +17,13 @@
 </head>
 <body>
 <div style="margin: 10px 0;">
-  <input id="roomid" type="text" placeholder="roomid" value="5050">
-  <button id="btn" onclick="init()">init</button>
+  <input id="roomid" type="text" placeholder="房间号">
+  <button id="btn" onclick="init()">确定</button>
+  <span>
+    <label>画质:</label>
+  <span id="qnContainer"></span>
+  </span>
+  <a href="/multiple.html">多流播放</a>
 </div>
 <div id="info"></div>
 <div id="logInfo"></div>
@@ -27,10 +32,60 @@
 <script>
   let flvPlayer = null
   let t = null
+  let quality_description = [
+    {
+      "qn": 30000,
+      "desc": "杜比",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 20000,
+      "desc": "4K",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 10000,
+      "desc": "原画",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 400,
+      "desc": "蓝光",
+      "hdr_desc": "HDR",
+      "attr_desc": null
+    },
+    {
+      "qn": 250,
+      "desc": "超清",
+      "hdr_desc": "HDR",
+      "attr_desc": null
+    },
+    {
+      "qn": 150,
+      "desc": "高清",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 80,
+      "desc": "流畅",
+      "hdr_desc": "",
+      "attr_desc": null
+    }
+  ]
+  let qn = '20000'
+  initQn()
 
   function init() {
     const roomid = document.querySelector('#roomid').value
-    console.log(roomid)
+    if(!roomid) {
+      window.alert('请输入房间号')
+      return
+    }
+
     const url = `/api/roomData?roomid=${ roomid }`
     fetch(url)
       .then(res => res.json())
@@ -44,19 +99,31 @@
       })
   }
 
+  function initQn() {
+    let t = ''
+    quality_description.forEach((item, index) => {
+      t += `<input type="radio" name="qn" value="${item.qn}" id="qn${index}" class="qn" /><label for="qn${index}" style="margin-right: 15px;">${item.desc}</label>`
+    })
+    document.getElementById('qnContainer').innerHTML = t
+    document.querySelectorAll('.qn').forEach(el => {
+      el.onclick = function (e) {
+        qn = e.target.value
+      }
+      el.checked = el.value === qn;
+    })
+  }
+
   function getLiveData(cid) {
-    const url = `/api/liveData?cid=${ cid }`
+    const url = `/api/liveData?qn=${qn}&cid=${ cid }`
     fetch(url)
       .then(res => res.json())
       .then(res => {
-        if (res.code !== 0) {
-          return
+        let durl = []
+        if (res.data.play_url && res.data.play_url.durl.length) {
+          durl = res.data.play_url.durl
         }
-        const durl = res.data.play_url.durl || []
-        console.log('durl', durl)
         if (durl.length === 0) return;
         const durlUrl = durl[0].url
-        console.log('durlUrl', durlUrl)
         let liveUrl = `/api/${durlUrl}`
         document.querySelector('#durlUrl').innerHTML = `<span class="labTitle">stream url:</span> <a href="${ durlUrl }" target="_blank">durlUrl</a>`
         document.querySelector('#urlinfo').innerHTML = `<span class="labTitle">proxy stream url:</span> <a href="${ liveUrl }" target="_blank">api url</a>`
@@ -70,6 +137,7 @@
       <div><span class="labTitle">title: </span><a href="https://live.bilibili.com/${ data.cid }" target="_blank">${ data.title }</a></div>
       <div><span class="labTitle">cid: </span><a href="https://live.bilibili.com/${ data.cid }" target="_blank">${ data.cid }</a></div>
       <div><span class="labTitle">sid: </span><a href="https://live.bilibili.com/${ data.sid }" target="_blank">${ data.sid }</a></div>
+      <div><span class="labTitle">uname: </span><a href="https://space.bilibili.com/${ data.uid }" target="_blank">${ data.uname }</a></div>
       <div><span class="labTitle">uid: </span><a href="https://space.bilibili.com/${ data.uid }" target="_blank">${ data.uid }</a></div>
       <div><span class="labTitle">live_status:</span> ${ data.live_status }</div>
       <div id="durlUrl"></div>

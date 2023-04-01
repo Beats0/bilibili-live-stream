@@ -1,0 +1,193 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+        content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="referrer" content="no-referrer">
+  <title>live</title>
+  <style>
+      body {
+          --videoItemWidth: 25%;
+      }
+      .videoItem {
+          width: var(--videoItemWidth);
+          background: #000;
+      }
+
+      .videoPlayer {
+          width: 100%;
+          height: 100%;
+      }
+
+  </style>
+</head>
+<body>
+<div style="margin: 10px 0;">
+  <input id="roomid" type="text" placeholder="多个房间号以,分割" value="">
+  <button id="btn" onclick="init()">添加</button>
+  <span>
+    <label>画质:</label>
+  <span id="qnContainer"></span>
+  </span>
+  <a href="/">单流播放</a>
+</div>
+<div id="info"></div>
+<div id="logInfo"></div>
+<div id="videos" style="display: flex;flex-wrap: wrap;"></div>
+
+<script type="text/javascript" src="./flv.min.js"></script>
+<script>
+  let roomsInfo = []
+  let quality_description = [
+    {
+      "qn": 30000,
+      "desc": "杜比",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 20000,
+      "desc": "4K",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 10000,
+      "desc": "原画",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 400,
+      "desc": "蓝光",
+      "hdr_desc": "HDR",
+      "attr_desc": null
+    },
+    {
+      "qn": 250,
+      "desc": "超清",
+      "hdr_desc": "HDR",
+      "attr_desc": null
+    },
+    {
+      "qn": 150,
+      "desc": "高清",
+      "hdr_desc": "",
+      "attr_desc": null
+    },
+    {
+      "qn": 80,
+      "desc": "流畅",
+      "hdr_desc": "",
+      "attr_desc": null
+    }
+  ]
+  let qn = '20000'
+  initQn()
+
+  function init() {
+    const roomidStr = document.querySelector('#roomid').value
+    const roomids = roomidStr.split(',').map(id => Number(id)).filter(id => id > 0)
+    if(roomids.length === 0) {
+      window.alert('请输入房间号')
+      return
+    }
+    for (let i = 0; i < roomids.length; i++) {
+      const roomid = roomids[i]
+      const url = `/api/roomData?roomid=${ roomid }`
+      fetch(url)
+        .then(res => res.json())
+        .then(res => {
+          roomsInfo.push(res)
+          createVideoElement(res.cid)
+          setLayout()
+          getLiveData(res.cid)
+        })
+    }
+  }
+
+  function initQn() {
+    let t = ''
+    quality_description.forEach((item, index) => {
+      t += `<input type="radio" name="qn" value="${item.qn}" id="qn${index}" class="qn" /><label for="qn${index}" style="margin-right: 15px;">${item.desc}</label>`
+    })
+    document.getElementById('qnContainer').innerHTML = t
+    document.querySelectorAll('.qn').forEach(el => {
+      el.onclick = function (e) {
+        qn = e.target.value
+      }
+      el.checked = el.value === qn;
+    })
+  }
+
+  function getLiveData(cid) {
+    const url = `/api/liveData?qn=${qn}&cid=${ cid }`
+    fetch(url)
+      .then(res => res.json())
+      .then(res => {
+        let durl = []
+        if (res.data.play_url && res.data.play_url.durl.length) {
+          durl = res.data.play_url.durl
+        }
+        if (durl.length === 0) return;
+        const durlUrl = durl[0].url
+        const liveUrl = `ws://${window.location.host}/api?url=` + window.btoa(durlUrl)
+        loadPlayer(liveUrl, cid)
+      })
+  }
+
+  function createVideoElement(cid) {
+    const roomInfo = roomsInfo.filter(item => item.cid === cid)[0]
+    const el = document.createElement('div')
+    el.setAttribute('class', 'videoItem')
+    el.setAttribute('title', `title:${ roomInfo.title }\nroomid: ${ roomInfo.sid || roomInfo.cid }\nuname: ${roomInfo.uname }`)
+    el.innerHTML = `<video id="videoElement${ cid }" class="videoPlayer" autoplay controls></video>`
+    document.getElementById('videos').appendChild(el)
+  }
+
+  function loadPlayer(liveUrl, cid) {
+    console.log('cid', cid, 'liveUrl', liveUrl);
+    if (!flvjs.isSupported()) {
+      window.alert('不支持flvjs')
+      return
+    }
+
+    const videoElement = document.getElementById('videoElement' + cid);
+    const flvPlayer = flvjs.createPlayer({
+      type: 'flv',
+      url: liveUrl,
+      isLive: true,
+    }, {
+      enableStashBuffer: false,
+      fixAudioTimestampGap: false,
+      isLive: true,
+    });
+    flvPlayer.attachMediaElement(videoElement);
+    flvPlayer.load();
+    flvPlayer.play();
+    flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+      console.log('ERROR', errorType, errorDetail, errorInfo)
+    })
+    flvPlayer.on(flvjs.Events.MEDIA_INFO, (e) => {
+      console.log('MEDIA_INFO', e)
+    })
+  }
+
+  function setLayout() {
+    const n = roomsInfo.length
+    let width = '25%'
+    if (n === 1) {
+      width = '70%'
+    } else if (n >= 2 && n <= 4) {
+      width = '50%'
+    } else if (n >= 5 && n <= 6) {
+      width = '33.33%'
+    } else {
+      width = '25%'
+    }
+    document.body.style.setProperty('--videoItemWidth', width)
+  }
+</script>
+</body>
+</html>
