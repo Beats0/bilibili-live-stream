@@ -1,0 +1,88 @@
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport"
+    content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <meta name="referrer" content="no-referrer">
+  <title>live</title>
+  <style>
+    body {
+      --videoItemWidth: 25%;
+    }
+
+    .videoItem {
+      width: var(--videoItemWidth);
+      background: #000;
+    }
+
+    .videoPlayer {
+      width: 100%;
+      height: 100%;
+    }
+  </style>
+</head>
+
+<body>
+  <div style="margin: 10px 0;">
+    <span>rtsp播放</span>
+    <a href="/">单流播放</a>
+  </div>
+  <div id="info"></div>
+  <div id="logInfo"></div>
+  <div id="videos" style="display: flex;flex-wrap: wrap;"></div>
+
+  <script type="text/javascript" src="./flv.min.js"></script>
+  <script>
+    const arr = [
+      { id: '101', url: 'rtsp://user:password@192.168.1.136:554/Streaming/Channels/101' },
+      { id: '201', url: 'rtsp://user:password@192.168.1.136:554/Streaming/Channels/201' },
+    ]
+
+    arr.forEach(item => {
+      const cid = item.id
+      const rtspUrl = item.url
+      const liveUrl = `ws://${window.location.host}/rtsp?url=` + window.btoa(rtspUrl)
+      createVideoElement(cid)
+      loadPlayer(liveUrl, cid)
+    })
+
+    function createVideoElement(cid) {
+      const el = document.createElement('div')
+      el.setAttribute('class', 'videoItem')
+      el.innerHTML = `<video id="videoElement${cid}" class="videoPlayer" autoplay controls></video>`
+      document.getElementById('videos').appendChild(el)
+    }
+
+    function loadPlayer(liveUrl, cid) {
+      console.log('cid', cid, 'liveUrl', liveUrl);
+      if (!flvjs.isSupported()) {
+        window.alert('不支持flvjs')
+        return
+      }
+
+      const videoElement = document.getElementById('videoElement' + cid);
+      const flvPlayer = flvjs.createPlayer({
+        type: 'flv',
+        url: liveUrl,
+        isLive: true,
+      }, {
+        enableStashBuffer: false,
+        fixAudioTimestampGap: false,
+        isLive: true,
+      });
+      flvPlayer.attachMediaElement(videoElement);
+      flvPlayer.load();
+      flvPlayer.play();
+      flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail, errorInfo) => {
+        console.log('ERROR', errorType, errorDetail, errorInfo)
+      })
+      flvPlayer.on(flvjs.Events.MEDIA_INFO, (e) => {
+        console.log('MEDIA_INFO', e)
+      })
+    }
+  </script>
+</body>
+
+</html>

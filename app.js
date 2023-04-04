@@ -5,6 +5,9 @@ const request = require('request');
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const expressWebSocket = require("express-ws");
 const websocketStream = require('websocket-stream/stream');
+const ffmpeg = require("fluent-ffmpeg");
+
+ffmpeg.setFfmpegPath("ffmpeg");
 
 const app = express();
 const port = 3000
@@ -33,7 +36,7 @@ function getApiData(url) {
 async function getRoomData(req, res) {
   const roomid = Number(req.query.roomid)
   try {
-    const roomData = await getApiData(`https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id=${ roomid }`)
+    const roomData = await getApiData(`https://api.live.bilibili.com/xlive/web-room/v1/index/getInfoByRoom?room_id=${roomid}`)
     if (roomData.code !== 0) {
       res.writeHead(500);
       res.end(JSON.stringify({ code: 0 }))
@@ -58,7 +61,7 @@ async function getRoomData(req, res) {
 async function getLiveData(req, res) {
   const cid = req.query.cid
   const qn = req.query.qn
-  const liveData = await getApiData(`https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomPlayInfo?room_id=${ cid }&play_url=1&mask=1&qn=${qn}&platform=web`)
+  const liveData = await getApiData(`https://api.live.bilibili.com/xlive/web-room/v1/index/getRoomPlayInfo?room_id=${cid}&play_url=1&mask=1&qn=${qn}&platform=web`)
   res.setHeader("Content-Type", "application/json");
   res.end(JSON.stringify(liveData))
 }
@@ -70,7 +73,7 @@ function proxyLiveStream(req, res) {
   const reg = /http.*.bilivideo.com/g
   // const target = 'https://cn-sccd-ct-01-08.bilivideo.com'
   const target = req.url.match(reg)[0]
-  const oTarget =  `/api/${target}`
+  const oTarget = `/api/${target}`
   const fn = createProxyMiddleware({
     target,
     changeOrigin: true,
@@ -86,6 +89,10 @@ function proxyWsStream(ws, req) {
     binary: true,
   });
   let url = req.url;
+  if (url.indexOf('/rtsp/') !== -1) {
+    return proxyRtspWsStream(ws, req, stream)
+  }
+
   if (url.indexOf('/api/') !== -1) {
     url = new Buffer.from(req.query.url, 'base64').toString(); // base64解码
     req.headers.referer = 'https://live.bilibili.com'
@@ -113,6 +120,40 @@ function proxyWsStream(ws, req) {
   }
 }
 
+
+function proxyRtspWsStream(ws, req, stream) {
+  const url = new Buffer.from(req.query.url, 'base64').toString(); // base64解码
+  ws.on('close', () => {
+    console.log('websocket closed');
+  })
+  const ffmpegCommand = ffmpeg(url)
+    .addInputOption("-rtsp_transport", "tcp", "-buffer_size", "102400")
+    .on("start", function () {
+      console.log(url, "Stream started.");
+    })
+    .on("codecData", function () {
+      console.log(url, "Stream codecData.")
+    })
+    .on("error", function (err) {
+      stream.end()
+      console.log(url, "An error occured: ", err.message);
+    })
+    .on("end", function () {
+      stream.end()
+      console.log(url, "Stream end!");
+    })
+    .outputFormat("flv").videoCodec("copy").noAudio();
+
+  stream.on('close', function () {
+    ffmpegCommand.kill('SIGKILL')
+  })
+  try {
+    ffmpegCommand.pipe(stream)
+  } catch (error) {
+    console.log(error)
+  }
+}
+
 app.listen(port, () => {
-  console.log(`listen on: http://localhost:${ port }`);
+  console.log(`listen on: http://localhost:${port}`);
 })

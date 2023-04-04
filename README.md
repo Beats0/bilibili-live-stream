@@ -18,10 +18,13 @@ yarn start
 
 复制 `api url` 地址链接可用使用vlc等流媒体播放
 
-单流 http://localhost:3000/index.html
+单流 `http` 播放 http://localhost:3000/index.html
 
 ![img1.webp](./img1.webp)
 
-多流 http://localhost:3000/multiple.html
+多流 `ws` 播放 http://localhost:3000/multiple.html
 
 ![img2.webp](./img2.webp)
+
+多流 `rtsp` 播放 http://localhost:3000/rtsp.html
+
